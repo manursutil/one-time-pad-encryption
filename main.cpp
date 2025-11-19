@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cstddef>
 #include <cstdlib>
 #include <fstream>
