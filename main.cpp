@@ -1,19 +1,48 @@
+#include <cstdint>
 #include <cstddef>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-std::vector<int> encrypt(std::string file_path)
+enum class ErrorCode {
+    SUCCESS = 0,
+    FILE_ERROR = 1,
+    PARSE_ERROR = 2,
+    SIZE_MISMATCH = 3,
+    USAGE_ERROR = 4
+};
+
+using KeyType = std::vector<uint8_t>;
+using EncryptedType = std::vector<uint8_t>;
+
+KeyType generate_key(std::size_t length)
+{
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dis(0, 255);
+
+    KeyType key;
+    key.reserve(length);
+
+    for (std::size_t i = 0; i < length; i++)
+    {
+        key.push_back(static_cast<uint8_t>(dis(gen)));
+    }
+
+    return key;
+}
+
+EncryptedType encrypt(const std::string& file_path, const std::string& key_output_path)
 {
     std::ifstream file;
     file.open(file_path);
     if (!file)
     {
-        std::cout << "Unable to open file\n";
-        std::exit(1);
+        throw std::runtime_error("Unable to open input file: " + file_path);
     }
 
     std::string plain_text;
@@ -25,24 +54,35 @@ std::vector<int> encrypt(std::string file_path)
     }
     file.close();
 
-    std::vector<int> key;
-    for (std::size_t i = 0; i < plain_text.length(); i++)
+    if (!plain_text.empty() && plain_text.back() == ' ')
     {
-        int rand_num = rand() % 256;
-        key.push_back(rand_num);
+        plain_text.pop_back();
     }
 
-    std::ofstream key_file("secret_key.txt");
-    for (int key_value : key)
+    KeyType key = generate_key(plain_text.length());
+
+    std::ofstream key_file(key_output_path);
+    if (!key_file)
     {
-        key_file << key_value << " ";
+        throw std::runtime_error("Unable to create key file: " + key_output_path);
+    }
+
+    for (std::size_t i = 0; i < key.size(); i++)
+    {
+        key_file << static_cast<int>(key[i]);
+        if (i < key.size() - 1)
+        {
+            key_file << " ";
+        }
     }
     key_file.close();
 
-    std::vector<int> encrypted;
+    EncryptedType encrypted;
+    encrypted.reserve(plain_text.length());
+
     for (std::size_t i = 0; i < plain_text.length(); i++)
     {
-        int xored = plain_text[i] ^ key[i];
+        uint8_t xored = static_cast<uint8_t>(plain_text[i]) ^ key[i];
         encrypted.push_back(xored);
     }
 
