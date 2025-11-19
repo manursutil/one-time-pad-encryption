@@ -93,49 +93,48 @@ std::string decrypt(std::string key_file_path, std::string encrypted_file_path)
 {
     std::ifstream key_file;
     key_file.open(key_file_path);
+    if (!key_file)
+    {
+        throw  std::runtime_error("Unable to open key file: " + key_file_path);
+    }
 
     std::ifstream encrypted_file;
     encrypted_file.open(encrypted_file_path);
 
-    if (!key_file || !encrypted_file)
+    if (!encrypted_file)
     {
-        std::cout << "Unable to open file\n";
-        std::exit(1);
+        throw  std::runtime_error("Unable to open key file: " + encrypted_file_path);
     }
 
-    std::vector<int> key;
-    std::string key_num_string;
-    while (key_file >> key_num_string)
+    KeyType key;
+    int key_num;
+    while (key_file >> key_num)
     {
-        try 
+        if (key_num < 0 || key_num > 255)
         {
-            key.push_back(std::stoi(key_num_string));
+            throw std::out_of_range("Key value out of byte range: " + std::to_string(key_num));
         }
-        catch (...)
+        key.push_back(static_cast<uint8_t>(key_num));
+    }
+
+    if (key_file.bad())
+    {
+        throw std::runtime_error("Error reading key file");
+    }
+
+    EncryptedType encrypted;
+    int encrypted_num;
+    while (encrypted_file >> encrypted_num)
+    {
+        if (encrypted_num < 0 || encrypted_num > 255)
         {
-            std::cout << "Error parsing key file data.\n";
-            std::exit(1);
+            throw std::runtime_error("Encrypted value out of byte range: " + std::to_string(encrypted_num));
         }
     }
 
-    std::vector<int> encrypted;
-    std::string num_string;
-    while (encrypted_file >> num_string)
+    if (encrypted_file.bad())
     {
-        try 
-        {
-            encrypted.push_back(std::stoi(num_string));
-        }
-        catch (const std::out_of_range& e)
-        {
-            std::cout << "Error: a number in the encrypted file is too large: " << num_string << "\n";
-            std::exit(1);
-        }
-        catch (const std::invalid_argument& e)
-        {
-            std::cout << "Error: encypted file contains non-number data: " << num_string << "\n";
-            std::exit(1);
-        }
+        throw std::runtime_error("Error reading encrypted file");
     }
 
     if (key.size() != encrypted.size())
@@ -143,8 +142,9 @@ std::string decrypt(std::string key_file_path, std::string encrypted_file_path)
         std::cout << "Warning: Key size (" << key.size() << ") and Encrypted size (" << encrypted.size() << ") do not match.\n";
     }
 
-    std::vector<int> decrypted;
+    std::string decrypted;
     size_t len = std::min(key.size(), encrypted.size());
+    decrypted.reserve(len);
 
     for (std::size_t i = 0; i < len; i++)
     {
@@ -152,7 +152,7 @@ std::string decrypt(std::string key_file_path, std::string encrypted_file_path)
         decrypted.push_back(xored);
     }
 
-    return std::string(decrypted.begin(), decrypted.end());
+    return decrypted;
 }
 
 int main(int argc, char* argv[])
