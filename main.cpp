@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <cstdlib>
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -157,64 +158,78 @@ std::string decrypt(std::string key_file_path, std::string encrypted_file_path)
 
 int main(int argc, char* argv[])
 {
-    srand(time(NULL));
-
-    if (argc < 2)
+    try
     {
-        std::cout << "Usage:\n";
-        std::cout << "  " << argv[0] << " encrypt <input_text_file>\n";
-        std::cout << "    - Encrypts <input_text_file> and outputs 'output.txt' and 'secret_key.txt'\n";
-        std::cout << "  " << argv[0] << " decrypt <secret_key.txt> <output.txt>\n";
-        std::cout << "    - Decrypts <output.txt> using <secret_key.txt> and prints the result\n";
-        return 1;
-    }
-
-    std::string mode = argv[1];
-
-    if (mode == "encrypt")
-    {
-        if (argc < 3) 
+        if (argc < 2)
         {
-            std::cout << "Error: Missing input file.\nUsage: " << argv[0] << " encrypt <input_text_file>\n";
+            std::cout << "Usage:\n";
+            std::cout << "  " << argv[0] << " encrypt <input_text_file>\n";
+            std::cout << "    - Encrypts <input_text_file> and outputs 'output.txt' and 'secret_key.txt'\n";
+            std::cout << "  " << argv[0] << " decrypt <secret_key.txt> <output.txt>\n";
+            std::cout << "    - Decrypts <output.txt> using <secret_key.txt> and prints the result\n";
             return 1;
         }
 
-        std::vector<int> encrypted = encrypt(argv[2]);
+        std::string mode = argv[1];
 
-        std::ofstream output_file("output.txt");
-        if (!output_file) 
+        if (mode == "encrypt")
         {
-            std::cout << "Unable to create output.txt\n";
-            return 1;
+            if (argc < 3) 
+            {
+                std::cerr << "Error: Missing input file.\nUsage: " << argv[0] << " encrypt <input_text_file>\n";
+                return static_cast<int>(ErrorCode::USAGE_ERROR);
+            }
+
+            std::string input_file = argv[2];
+            std::string key_file = "secret_key.txt";
+            std::string output_file = "output.txt";
+
+            EncryptedType encrypted = encrypt(input_file, key_file);
+
+            std::ofstream out(output_file);
+            if (!out)
+            {
+                throw std::runtime_error("Unable to create output file: " + output_file);
+            }
+
+            for (std::size_t i = 0; i < encrypted.size(); i++)
+            {
+                out << static_cast<int>(encrypted[i]);
+                if (i < encrypted.size() - 1)
+                {
+                    out << " ";
+                }
+            }
+            out.close();
+
+            std::cout << "Success! Created '" << output_file << "' and '" << key_file << "'\n";
+        }
+        else if (mode == "decrypt")
+        {
+            if (argc < 4) 
+            {
+                std::cerr << "Error: Missing arguments.\n";
+                std::cerr << "Usage: " << argv[0] << " decrypt <secret_key.txt> <output.txt>\n";
+                return static_cast<int>(ErrorCode::USAGE_ERROR);
+            }
+
+            std::string key_file_path = argv[2];
+            std::string encrypted_file_path = argv[3];
+
+            std::string decrypted = decrypt(key_file_path, encrypted_file_path);
+            std::cout << "Decrypted text:\n" << decrypted << "\n";
+        }
+        else
+        {
+            std::cerr << "Invalid mode. Use 'encrypt' or 'decrypt'.\n";
+            return static_cast<int>(ErrorCode::USAGE_ERROR);
         }
 
-        for (int num : encrypted)
-        {
-            output_file << num << " "; 
-        }
-
-        std::cout << "Success! Created 'output.txt' and 'secret_key.txt'\n";
-        output_file.close();
+        return static_cast<int>(ErrorCode::SUCCESS);
     }
-    else if (mode == "decrypt")
+    catch (const std::exception& e)
     {
-        if (argc < 4) 
-        {
-            std::cout << "Error: Missing arguments.\nUsage: " << argv[0] << " decrypt <secret_key.txt> <output.txt>\n";
-            return 1;
-        }
-
-        std::string key_file_path = argv[2];
-        std::string encrypted_file_path = argv[3];
-
-        std::string decrypted = decrypt(key_file_path, encrypted_file_path);
-        std::cout << "Decrypted text:\n" << decrypted << "\n";
+        std::cerr << "Error: " << e.what() << "\n";
+        return static_cast<int>(ErrorCode::FILE_ERROR);
     }
-    else
-    {
-        std::cout << "Invalid mode. Use 'encrypt' or 'decrypt'.\n";
-        return 1;
-    }
-
-    return 0;
 }
